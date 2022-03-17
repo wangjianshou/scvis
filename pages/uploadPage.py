@@ -4,55 +4,16 @@ import dash_uploader as du
 import dash_bootstrap_components as dbc
 from dash import dcc, html, Input, Output, callback, State, no_update
 
-
-
-
-from dash.exceptions import PreventUpdate
 from os import path
+from copy import deepcopy
 from .tools import generateTable
-from .cellTrans import filterData
+#from .cellTrans import filterData
 from .setting import DATA_PATH
 
 
-'''
-layout = dbc.Container(
-        [
-            dbc.Row([dbc.Col(du.Upload(
-                id='upload-file',
-                text='upload file',
-                text_completed='Uploaded',
-                cancel_button=True,
-                pause_button=True,
-                filetypes=None,
-                max_files=1,
-                default_style={
-                    'background-color': '#fafafa',
-                    'font-weight': 'bold',
-                    'min-height':'10px',
-                    'line-height':'15px',
-                },
-                upload_id=uuid.uuid1()
-                ), width=4),
-                dbc.Col(dbc.Input(id="input-samplename", placeholder="SampleNames...", type="text",), width=2),
-                dbc.Col(dbc.Input(id="input-groupname", placeholder="GroupNames...", type="text"), width=2),
-                dbc.Col(dbc.Button("Submit", id='upload-data', className="me-1", color='dark', outline=True), width=1),
-                dbc.Col(dbc.Alert(id="alert-upload-data", dismissable=True, is_open=False, color='success',
-                                  style={"height":'60%', 'verticalAlign':'middle',},
-                                  )
-                        ),
-                ],
-                align='baseline',
-                justify='baseline',
-            ),
-            dbc.Row(dbc.Col(id='sampleInfo', md=4)),
-        ],
-        style={'margin-top':'10px'},
-)
-'''
-
 upload_data_tab = dbc.Tab(
     dbc.Card(
-        [ dbc.CardBody(
+        [dbc.CardBody(
             [
             du.Upload(
                 id='upload-file', text='upload file', text_completed='Uploaded',
@@ -64,7 +25,7 @@ upload_data_tab = dbc.Tab(
                     'line-height':'15px',
                 },
                 upload_id=uuid.uuid1(),
-                ),
+            ),
 
             dbc.Input(id="input-samplename", placeholder="SampleNames...", type="text", style={'margin-top':'20px'}),
             dbc.Input(id="input-groupname", placeholder="GroupNames...", type="text", style={'margin-top':'10px'}),
@@ -111,13 +72,51 @@ filter_data_tab = dbc.Tab(
     label='FilterData',
 )
 
-violinFig = dbc.Tab(dcc.Graph(id='violin'), label='Fig1')
 
+tmp_x = [{'label':'n_genes_by_counts', 'value':'n_genes_by_counts'},
+         {'label':'total_counts', 'value':'total_counts'},
+         {'label':'pct_counts_mt', 'value':'pct_counts_mt'},]
+
+violinFig = dbc.Tab(
+    [
+
+        dbc.Row(
+            [
+                dbc.Col(dcc.Dropdown(id='filter-violin-1', value='n_genes_by_counts', options=tmp_x, clearable=False),
+                        md=3),
+                dbc.Col(dcc.Dropdown(id='filter-violin-2', value='total_counts', options=tmp_x, clearable=False), md=3),
+                dbc.Col(dcc.Dropdown(id='filter-violin-3', value='pct_counts_mt', options=tmp_x, clearable=False), md=3),
+            ],
+            justify='evenly', style={'margin-top':'20px'},
+        ),
+        dcc.Graph(id='violin'),
+        dbc.Row(
+            [
+                dbc.Col(dcc.Dropdown(id='filter-scatter-x', value='total_counts', options=tmp_x, clearable=False), md=3),
+                dbc.Col(dcc.Dropdown(id='filter-scatter-y', value='pct_counts_mt', options=tmp_x, clearable=False), md=3),
+            ],
+            justify='evenly', style={'margin-top': '20px'},
+        ),
+        dcc.Graph(id='scatter'),
+    ],
+    label='FilterDataFigure'
+)
+
+
+figParameter = dbc.Card(
+    [dbc.CardBody(
+        [
+            html.H6('Visualization Parameters:'),
+            dcc.Dropdown(id='filter-sample-fig', placeholder="Select sample"),
+        ],
+    ),],
+    style={"margin-top": "20px"},
+)
 
 
 layout = html.Div(
     dbc.Row([
-                dbc.Col(dbc.Tabs([upload_data_tab, filter_data_tab], ), md=3,),
+                dbc.Col([dbc.Tabs([upload_data_tab, filter_data_tab],), figParameter], md=3,),
                 dbc.Col(dbc.Tabs([violinFig, dbc.Tab(label='Fig2')]), md=9),
             ]
     )
@@ -138,50 +137,43 @@ layout = html.Div(
           State('meta-data', 'data')
         )
 def uploadData(n, sampleName, groupName, upload_id, fileNames, is_open, metadata):
+    metadata = deepcopy(metadata)
     if not n or sampleName is None:
         return no_update, no_update, no_update
     if 'sampleInfo' not in metadata.keys():
         metadata['sampleInfo'] = dict()
-    metadata['sampleInfo'][sampleName] = (sampleName, groupName, upload_id, fileNames[0])
-    table = generateTable(metadata['sampleInfo'], '100px', 10)
+    metadata['sampleInfo'][sampleName] = dict(sampleName=sampleName, groupName=groupName, uuid=upload_id, fileName=fileNames[0])
+    #table = generateTable(metadata['sampleInfo'], '100px', 10)
     if n and sampleName is not None:
         return f"Data of {sampleName} in Group {groupName} is added!", is_open and no_update or True, metadata
     elif n and sampleName is None:
         return "Please assign sample name to data", is_open and no_update or True, metadata
 
 
+
 @callback(Output('sampleinfo-table', 'children'),
-          Input('meta-data', 'data'),)
-def sampleinfoTable(metadata):
-    return generateTable(metadata['sampleInfo'], '100px', 10)
+          Input('meta-data', 'data'),
+          Input('meta-data2', 'data'),
+          prevent_initial_call=True,)
+def sampleinfoTable(metadata, metadata2):
+    if metadata2 == dict():
+        return generateTable(metadata['sampleInfo'], '200px', 10)
+    else:
+        return generateTable(metadata2['sampleInfo'], '200px', 10)
+
 
 
 @callback(Output('checklist-samples', 'options'),
-          Input('meta-data', 'data'),
           Input('refresh-samples-list', 'n_clicks'),
+          Input('meta-data', 'data'),
           )
-def sampleChecklist(metadata, n):
+def sampleChecklist(n, metadata):
     if 'sampleInfo' not in metadata.keys():
         return no_update
-    return [{'label':i, 'value':i} for i in metadata['sampleInfo'].keys()]
+    output1 =  [{'label':i, 'value':i} for i in metadata['sampleInfo'].keys()]
+    #output2 = [{'label': i, 'value': i, 'disabled':True} for i in metadata['sampleInfo'].keys()]
+    return output1
 
-@callback(Output('violin', 'figure'),
-          Input('run-filter-data', 'n_clicks'),
-          State('filter-umi', 'value'),
-          State('filter-ngene', 'value'),
-          State('filter-mito', 'value'),
-          State('filter-ncell', 'value'),
-          State('checklist-samples', 'value'),
-          State("meta-data", 'data'),
-          )
-def filterDataPipeline(n, umi, ngene, mito, ncell, samples, metadata):
-    if not n:
-        return no_update
-    info = metadata['sampleInfo']
-    for s in samples:
-        data = path.join(DATA_PATH, info[s][2], info[s][3])
-        fig = filterData(umi, ngene, mito, ncell, s, data)
-    return fig
 
 
 

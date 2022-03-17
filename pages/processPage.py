@@ -19,6 +19,7 @@ card = dbc.Card(
                     className="card-text",
                 ),
                 dbc.Button("Go somewhere", color="primary"),
+                html.P(id='testpage'),
             ]
         ),
     ],
@@ -33,4 +34,9 @@ layout = dbc.Container(
 
     ]
 )
+
+@callback(Output('testpage', 'children'),
+          Input('meta-data2', 'data'))
+def f(x):
+    return json.dumps(x)
 
