@@ -10,6 +10,25 @@ from matplotlib import pyplot as plt
 from plotly import graph_objects as go
 
 
+'''
+def processData(adata, n_top_genes, n_pcs, n_neighbors):
+    sc.pp.highly_variable_genes(adata, flavor='seurat_v3', n_top_genes=n_top_genes)
+    sc.pp.normalize_total(adata, target_sum=1e4)
+    sc.pp.log1p(adata)
+    #sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
+    adata.raw = adata
+    adata = adata[:, adata.var.highly_variable]
+    sc.pp.scale(adata, max_value=10)
+    sc.tl.pca(adata, svd_solver='arpack')
+    sc.pp.neighbors(adata, n_neighbors=n_neighbors, n_pcs=n_pcs)
+    return adata
+'''
+
+
+
+
+
+
 # 请不要删除，请不要删除，请不要删除！
 '''
 def filterData(umi, ngene, mito, ncell, sample, data):
